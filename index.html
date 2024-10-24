@@ -32,23 +32,15 @@
             position: relative;
             width: 100%;
             border-radius: 24px;
-            background-color: #303134;
+            background-color: #202124;
             border: 1px solid #5f6368;
-            transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+            transition: all 0.2s ease;
         }
-        .search-box.has-input {
-            border-color: #8ab4f8;
-            box-shadow: 0 1px 6px rgba(138, 180, 248, 0.28);
-        }
-        .search-box:hover {
-            border-color: #8ab4f8;
-        }
-        .search-box:focus-within:not(.has-input) {
-            border-color: #8ab4f8;
-            box-shadow: none;
-        }
+        .search-box.has-input,
         .search-box:focus-within {
-            border-radius: 24px 24px 0 0;
+            background-color: #303134;
+            border-color: transparent;
+            box-shadow: 0 1px 6px 0 rgba(32, 33, 36, 0.28);
         }
         .search-input {
             width: 100%;
@@ -70,58 +62,6 @@
             height: 20px;
             fill: #9aa0a6;
         }
-        .suggestions-container {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background-color: #303134;
-            margin-top: -1px;
-            border: 1px solid #8ab4f8;
-            border-top: none;
-            border-radius: 0 0 24px 24px;
-            display: none;
-            z-index: 1000;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        }
-        .suggestion-item {
-            padding: 10px 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            color: #e8eaed;
-            transition: background-color 0.2s;
-        }
-        .suggestion-item:hover,
-        .suggestion-item.selected {
-            background-color: #3c4043;
-        }
-        .suggestion-icon {
-            width: 16px;
-            height: 16px;
-            fill: #9aa0a6;
-            margin-right: 12px;
-            flex-shrink: 0;
-        }
-        .suggestion-content {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-grow: 1;
-            padding: 4px 0;
-        }
-        .suggestion-text {
-            flex-grow: 1;
-        }
-        .suggestion-type {
-            font-size: 12px;
-            color: #9aa0a6;
-            padding: 2px 8px;
-            border-radius: 12px;
-            background-color: #404144;
-            margin-left: auto;
-        }
         .logo {
             width: 272px;
             height: 92px;
@@ -133,31 +73,6 @@
             color: #8ab4f8;
             font-weight: bold;
             letter-spacing: -2px;
-        }
-        .quick-links {
-            display: flex;
-            gap: 8px;
-            margin-top: 4px;
-            padding: 0 16px 8px 44px;
-        }
-        .quick-link {
-            color: #8ab4f8;
-            text-decoration: none;
-            font-size: 13px;
-            padding: 4px 8px;
-            border-radius: 12px;
-            background-color: #404144;
-            transition: background-color 0.2s;
-        }
-        .quick-link:hover {
-            background-color: #4b4d51;
-        }
-        .search-wrapper:focus-within .search-box {
-            border-radius: 24px 24px 0 0;
-            border-bottom: none;
-        }
-        .search-wrapper:focus-within .suggestions-container {
-            border-top: 1px solid #5f6368;
         }
     </style>
 </head>
@@ -171,190 +86,40 @@
                 </svg>
                 <input type="text" class="search-input" placeholder="Google Suche" aria-label="Suchbegriff eingeben">
             </div>
-            <div class="suggestions-container"></div>
         </div>
     </main>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const searchInput = document.querySelector('.search-input');
-            const suggestionsContainer = document.querySelector('.suggestions-container');
             const searchBox = document.querySelector('.search-box');
-            let selectedIndex = -1;
-            let suggestions = [];
-            let debounceTimer;
 
             function updateSearchBoxState() {
                 const hasInput = searchInput.value.trim().length > 0;
                 searchBox.classList.toggle('has-input', hasInput);
             }
 
-            async function fetchSuggestions(query) {
-                return [
-                    { text: query + " bedeutung", type: "Definition" },
-                    { text: query + " wikipedia", type: "Wiki" },
-                    { text: query + " aktuelle nachrichten", type: "News" },
-                    { text: query + " kaufen", type: "Shopping" },
-                    { text: query + " bilder", type: "Bilder" },
-                    { text: query + " youtube", type: "Video" }
-                ];
-            }
+            // Aktiviert den dunkleren Hintergrund beim Fokussieren
+            searchInput.addEventListener('focus', function() {
+                searchBox.style.backgroundColor = '#303134';
+            });
 
-            function highlightMatch(text, query) {
-                const regex = new RegExp(`(${query})`, 'gi');
-                return text.replace(regex, '<strong>$1</strong>');
-            }
-
-            function createQuickLinks(suggestion) {
-                const links = [
-                    { text: "Bilder", url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(suggestion)}` },
-                    { text: "News", url: `https://www.google.com/search?tbm=nws&q=${encodeURIComponent(suggestion)}` },
-                    { text: "Videos", url: `https://www.google.com/search?tbm=vid&q=${encodeURIComponent(suggestion)}` }
-                ];
-
-                const container = document.createElement('div');
-                container.className = 'quick-links';
-                
-                links.forEach(link => {
-                    const a = document.createElement('a');
-                    a.href = link.url;
-                    a.className = 'quick-link';
-                    a.textContent = link.text;
-                    container.appendChild(a);
-                });
-
-                return container;
-            }
-
-            function displaySuggestions(items, query) {
-                suggestionsContainer.innerHTML = '';
-                suggestions = items;
-                
-                items.forEach((item, index) => {
-                    const div = document.createElement('div');
-                    div.className = 'suggestion-item';
-                    div.innerHTML = `
-                        <div class="suggestion-content">
-                            <svg class="suggestion-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path>
-                            </svg>
-                            <span class="suggestion-text">${highlightMatch(item.text, query)}</span>
-                            <span class="suggestion-type">${item.type}</span>
-                        </div>
-                    `;
-
-                    if (index === selectedIndex) {
-                        div.classList.add('selected');
-                    }
-
-                    div.addEventListener('mouseenter', () => {
-                        selectedIndex = index;
-                        updateSelection();
-                    });
-
-                    div.addEventListener('click', () => {
-                        window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(item.text);
-                    });
-
-                    suggestionsContainer.appendChild(div);
-                    
-                    if (index === selectedIndex) {
-                        const quickLinks = createQuickLinks(item.text);
-                        div.appendChild(quickLinks);
-                    }
-                });
-
-                suggestionsContainer.style.display = items.length ? 'block' : 'none';
-                if (items.length) {
-                    searchBox.style.borderRadius = '24px 24px 0 0';
-                } else {
-                    searchBox.style.borderRadius = '24px';
+            // Zurück zum ursprünglichen Hintergrund wenn kein Fokus und kein Text
+            searchInput.addEventListener('blur', function() {
+                if (!this.value.trim()) {
+                    searchBox.style.backgroundColor = '#202124';
                 }
-            }
+            });
 
-            function updateSelection() {
-                const items = suggestionsContainer.querySelectorAll('.suggestion-item');
-                items.forEach((item, index) => {
-                    item.classList.toggle('selected', index === selectedIndex);
-                    
-                    const existingQuickLinks = item.querySelector('.quick-links');
-                    if (existingQuickLinks) {
-                        existingQuickLinks.remove();
-                    }
-                    
-                    if (index === selectedIndex) {
-                        const quickLinks = createQuickLinks(suggestions[index].text);
-                        item.appendChild(quickLinks);
-                    }
-                });
-            }
-
+            // Aktualisiere den Status bei Texteingabe
             searchInput.addEventListener('input', function() {
-                clearTimeout(debounceTimer);
-                const query = this.value.trim();
-                selectedIndex = -1;
-                
-                // Aktualisiere Suchbox-Zustand
                 updateSearchBoxState();
-                
-                if (query) {
-                    debounceTimer = setTimeout(async () => {
-                        const suggestions = await fetchSuggestions(query);
-                        displaySuggestions(suggestions, query);
-                    }, 300);
-                } else {
-                    suggestionsContainer.style.display = 'none';
-                    searchBox.style.borderRadius = '24px';
-                }
             });
 
-            searchInput.addEventListener('keydown', function(e) {
-                const isVisible = suggestionsContainer.style.display === 'block';
-
-                switch(e.key) {
-                    case 'ArrowDown':
-                        if (isVisible) {
-                            e.preventDefault();
-                            selectedIndex = (selectedIndex + 1) % suggestions.length;
-                            updateSelection();
-                        }
-                        break;
-                    case 'ArrowUp':
-                        if (isVisible) {
-                            e.preventDefault();
-                            selectedIndex = selectedIndex <= 0 ? suggestions.length - 1 : selectedIndex - 1;
-                            updateSelection();
-                        }
-                        break;
-                    case 'Enter':
-                        if (isVisible && selectedIndex >= 0) {
-                            e.preventDefault();
-                            window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(suggestions[selectedIndex].text);
-                        } else if (this.value.trim()) {
-                            window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(this.value.trim());
-                        }
-                        break;
-                    case 'Escape':
-                        if (isVisible) {
-                            suggestionsContainer.style.display = 'none';
-                            searchBox.style.borderRadius = '24px';
-                            selectedIndex = -1;
-                        }
-                        break;
-                }
-            });
-
-            searchInput.addEventListener('keyup', function(e) {
-                if (e.key === 'Backspace' || e.key === 'Delete') {
-                    updateSearchBoxState();
-                }
-            });
-
-            document.addEventListener('click', function(e) {
-                if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
-                    suggestionsContainer.style.display = 'none';
-                    searchBox.style.borderRadius = '24px';
-                    selectedIndex = -1;
+            // Bei Enter zur Google-Suche weiterleiten
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && this.value.trim()) {
+                    window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(this.value.trim());
                 }
             });
 
